@@ -322,9 +322,16 @@
                         aspect_ratio: "1:1"
                     });
 
+                    // To avoid CORS issues when the client tries to fetch the image later,
+                    // we fetch it here server-side, then upload it to our own storage.
+                    const response = await fetch(imageResult.url);
+                    const blob = await response.blob();
+                    const file = new File([blob], "generated_image.png", { type: blob.type });
+                    const uploadedUrl = await websim.upload(file);
+
                     await room.collection('base_image').create({
                         prompt: prompt,
-                        image_url: imageResult.url
+                        image_url: uploadedUrl
                     });
 
                     setPrompt('');
