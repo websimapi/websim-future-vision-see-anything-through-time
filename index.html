@@ -295,30 +295,48 @@
             const [generating, setGenerating] = useState(false);
             const [predicting, setPredicting] = useState(false);
             const [results, setResults] = useState(null);
+            const [preparingImages, setPreparingImages] = useState({});
 
             const baseImages = useSyncExternalStore(
                 room.collection('base_image').subscribe,
                 room.collection('base_image').getList
-            );
+            ) || [];
 
             const generateBaseImage = async () => {
                 if (!prompt.trim()) return;
                 
                 setGenerating(true);
                 try {
+                    // Generate image
                     const imageResult = await websim.imageGen({
                         prompt: prompt,
                         aspect_ratio: "1:1"
                     });
 
+                    const tempId = `temp_${Date.now()}`;
+                    setPreparingImages(prev => ({...prev, [tempId]: true }));
+                    
+                    // Fetch the generated image and upload it to our storage
+                    const response = await fetch(imageResult.url);
+                    const blob = await response.blob();
+                    const file = new File([blob], "image.png", { type: "image/png" });
+                    const uploadedUrl = await websim.upload(file);
+
+                    // Create the record with the stable, uploaded URL
                     await room.collection('base_image').create({
                         prompt: prompt,
-                        image_url: imageResult.url
+                        image_url: uploadedUrl
                     });
 
                     setPrompt('');
+                    setPreparingImages(prev => {
+                        const newPreparing = {...prev};
+                        delete newPreparing[tempId];
+                        return newPreparing;
+                    });
                 } catch (error) {
                     console.error('Error generating image:', error);
+                    alert('There was an error generating the image. Please try again.');
                 } finally {
                     setGenerating(false);
                 }
@@ -404,7 +422,7 @@ Provide a detailed description of how this scene would appear after ${timeDescri
                     setResults({
                         currentDescription,
                         futureDescription,
-                        futureImageUrl: uploadedFutureUrl,
+                        futureImageUrl: futureImageResult.url, // Use the direct URL from imageGen
                         timeDescription
                     });
 
@@ -447,6 +465,13 @@ Provide a detailed description of how this scene would appear after ${timeDescri
                     <div className="section">
                         <h2>🖼️ Select Base Image</h2>
                         <div className="gallery">
+                            {Object.keys(preparingImages).map(id => (
+                                <div key={id} className="gallery-item">
+                                    <div className="loading" style={{height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.2)'}}>
+                                        <div className="spinner"></div>
+                                    </div>
+                                </div>
+                            ))}
                             {baseImages.reverse().map(image => (
                                 <div 
                                     key={image.id}
@@ -461,7 +486,7 @@ Provide a detailed description of how this scene would appear after ${timeDescri
                                 </div>
                             ))}
                         </div>
-                        {baseImages.length === 0 && (
+                        {baseImages.length === 0 && Object.keys(preparingImages).length === 0 && (
                             <p style={{textAlign: 'center', opacity: 0.7, marginTop: '20px'}}>
                                 No base images yet. Generate one above!
                             </p>
