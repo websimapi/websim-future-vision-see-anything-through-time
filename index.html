@@ -387,15 +387,30 @@ Provide a detailed description of how this scene would appear after ${timeDescri
                         aspect_ratio: "1:1"
                     });
 
+                    // Step 4: Upload the future image to file storage
+                    const response = await fetch(futureImageResult.url);
+                    const blob = await response.blob();
+                    const uploadedFutureUrl = await websim.upload(blob);
+
+                    // Step 5: Save the future prediction as a base image
+                    const futureRecord = await room.collection('base_image').create({
+                        prompt: `Future: ${selectedImage.prompt} (after ${timeDescription})`,
+                        image_url: uploadedFutureUrl,
+                        is_future_prediction: true,
+                        original_image_id: selectedImage.id,
+                        time_range: timeDescription
+                    });
+
                     setResults({
                         currentDescription,
                         futureDescription,
-                        futureImageUrl: futureImageResult.url,
+                        futureImageUrl: uploadedFutureUrl,
                         timeDescription
                     });
 
                 } catch (error) {
                     console.error('Error predicting future:', error);
+                    alert('Failed to predict future. Please try again.');
                 } finally {
                     setPredicting(false);
                 }
@@ -521,4 +536,3 @@ Provide a detailed description of how this scene would appear after ${timeDescri
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
-
